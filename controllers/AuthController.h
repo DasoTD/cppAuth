@@ -1,6 +1,6 @@
 #pragma once
 #include <drogon/HttpController.h>
-#include "Bcrypt.cpp/include/bcrypt.h"
+#include <bcrypt.h>
 #include <jwt-cpp/jwt.h>
 #include <unordered_map>
 #include <mutex>

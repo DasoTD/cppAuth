@@ -1,25 +1,12 @@
-find_package(Drogon CONFIG REQUIRED)
-find_package(nlohmann_json CONFIG REQUIRED)
-
-add_executable(my_cppAuth main.cpp controllers/AuthController.cc)
-target_link_libraries(my_cppAuth PRIVATE Drogon::Drogon nlohmann_json::nlohmann_json)
-target_link_libraries(my_cppAuth PRIVATE bcrypt jwt-cpp)
-target_include_directories(my_cppAuth PRIVATE /usr/include/bcrypt /usr/include/jwt-cpp)
-target_include_directories(my_cppAuth PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/controllers)
-include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
-find_package(nlohmann_json 3.2.0 REQUIRED) 
-find_package(dotenv-cpp CONFIG REQUIRED)
-target_link_libraries(my_cppAuth PRIVATE dotenv-cpp)
-target_link_libraries(my_cppAuth PRIVATE nlohmann_json::nlohmann_json)
-#r_target PRIVATE external/jwt-cpp/include
-include_directories(${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include)
-
-
 cmake_minimum_required(VERSION 3.16)
 project(cppAuth)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# ======================================================
+# Dependencies
+# ======================================================
 
 # Drogon
 find_package(Drogon CONFIG REQUIRED)
@@ -28,110 +15,71 @@ find_package(Drogon CONFIG REQUIRED)
 find_package(PostgreSQL REQUIRED)
 include_directories(${PostgreSQL_INCLUDE_DIRS})
 
-# JWT-CPP
-find_path(JWT_CPP_INCLUDE_DIR jwt-cpp/jwt.h)
-include_directories(${JWT_CPP_INCLUDE_DIR})
-
 # dotenv-cpp (header-only)
-include_directories(${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/dotenv-cpp/include)
 
-# bcrypt
-include_directories(${CMAKE_SOURCE_DIR}/external/bcrypt/include)
+# bcrypt (local header-only or compiled)
+include_directories(${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/include)
+#include_directories(dotenv-cpp/include)
 
-# Source files
+
+# jwt-cpp (header-only)
+include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
+
+# JsonCpp (required by Drogon)
+set(JSONCPP_INCLUDE_DIRS "/usr/include/jsoncpp")
+set(JSONCPP_LIBRARIES "/usr/lib/x86_64-linux-gnu/libjsoncpp.so")
+
+
+# ======================================================
+# Source files (exclude test files)
+# ======================================================
 file(GLOB_RECURSE SRC_FILES
     "${CMAKE_SOURCE_DIR}/*.cc"
     "${CMAKE_SOURCE_DIR}/controllers/*.cc"
 )
+# Remove test files from SRC_FILES
+list(FILTER SRC_FILES EXCLUDE REGEX ".*/test/.*")
+list(FILTER SRC_FILES EXCLUDE REGEX ".*/tests/.*")
+list(FILTER SRC_FILES EXCLUDE REGEX ".*/base_test.cc$")
+
+# Add bcrypt implementation if needed
+list(APPEND SRC_FILES "${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/src/bcrypt.cpp")
+list(APPEND SRC_FILES "${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/src/blowfish.cpp")
 
 add_executable(${PROJECT_NAME} ${SRC_FILES})
 
-# Link Drogon and PostgreSQL
+# ======================================================
+# Link libraries
+# ======================================================
 target_link_libraries(${PROJECT_NAME}
     PRIVATE Drogon::Drogon
     PRIVATE ${PostgreSQL_LIBRARIES}
+    PRIVATE ${JSONCPP_LIBRARIES}
 )
 
-# Output binary to project root (optional)
+# ======================================================
+# Include directories
+# ======================================================
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${JSONCPP_INCLUDE_DIRS}
+    ${PostgreSQL_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/controllers
+    ${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include
+    ${CMAKE_SOURCE_DIR}/external/bcrypt/include
+    ${CMAKE_SOURCE_DIR}/external/jwt-cpp/include
+    ${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include
+)
+
+target_include_directories(cppAuth PRIVATE /path/to/Bcrypt.cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/dotenv-cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
+
+# ======================================================
+# Output binary in project root (optional)
+# ======================================================
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-
-
-
-
-# cmake_minimum_required(VERSION 3.5)
-# project(cppAuth CXX)
-
-# include(CheckIncludeFileCXX)
-
-# check_include_file_cxx(any HAS_ANY)
-# check_include_file_cxx(string_view HAS_STRING_VIEW)
-# check_include_file_cxx(coroutine HAS_COROUTINE)
-# if (NOT "${CMAKE_CXX_STANDARD}" STREQUAL "")
-#     # Do nothing
-# elseif (HAS_ANY AND HAS_STRING_VIEW AND HAS_COROUTINE)
-#     set(CMAKE_CXX_STANDARD 20)
-# elseif (HAS_ANY AND HAS_STRING_VIEW)
-#     set(CMAKE_CXX_STANDARD 17)
-# else ()
-#     set(CMAKE_CXX_STANDARD 14)
-# endif ()
-
-# set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_EXTENSIONS OFF)
-
-# add_executable(${PROJECT_NAME} main.cc)
-
-# # ##############################################################################
-# # If you include the drogon source code locally in your project, use this method
-# # to add drogon 
-# # add_subdirectory(drogon) 
-# # target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
-# #
-# # and comment out the following lines
-# find_package(Drogon CONFIG REQUIRED)
-# target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
-
-# # ##############################################################################
-
-# if (CMAKE_CXX_STANDARD LESS 17)
-#     message(FATAL_ERROR "c++17 or higher is required")
-# elseif (CMAKE_CXX_STANDARD LESS 20)
-#     message(STATUS "use c++17")
-# else ()
-#     message(STATUS "use c++20")
-# endif ()
-
-# aux_source_directory(controllers CTL_SRC)
-# aux_source_directory(filters FILTER_SRC)
-# aux_source_directory(plugins PLUGIN_SRC)
-# aux_source_directory(models MODEL_SRC)
-
-# drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
-#                     ${CMAKE_CURRENT_BINARY_DIR})
-# # use the following line to create views with namespaces.
-# # drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
-# #                     ${CMAKE_CURRENT_BINARY_DIR} TRUE)
-# # use the following line to create views with namespace CHANGE_ME prefixed
-# # and path namespaces.
-# # drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
-# #                     ${CMAKE_CURRENT_BINARY_DIR} TRUE CHANGE_ME)
-
-# target_include_directories(${PROJECT_NAME}
-#                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-#                                    ${CMAKE_CURRENT_SOURCE_DIR}/models)
-# target_sources(${PROJECT_NAME}
-#                PRIVATE
-#                ${SRC_DIR}
-#                ${CTL_SRC}
-#                ${FILTER_SRC}
-#                ${PLUGIN_SRC}
-#                ${MODEL_SRC})
-# # ##############################################################################
-# # uncomment the following line for dynamically loading views 
-# # set_property(TARGET ${PROJECT_NAME} PROPERTY ENABLE_EXPORTS ON)
-
-# # ##############################################################################
-
-# add_subdirectory(test)

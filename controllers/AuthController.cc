@@ -2,6 +2,7 @@
 #include <drogon/orm/DbClient.h>
 #include <drogon/orm/DbTypes.h>
 #include <nlohmann/json.hpp>
+#include <laserpants/dotenv/dotenv.h>
 #include <chrono>
 #include <drogon/drogon.h>
 #include <string>
@@ -16,9 +17,10 @@ using json = nlohmann::json;
 extern drogon::orm::DbClientPtr dbClient; // Initialized in main.cpp
 
 // ---------------------- Helper Functions ----------------------
+
 namespace {
     // Returns nullptr if JSON is invalid
-    std::shared_ptr<const drogon::HttpRequestJson> validateJson(const HttpRequestPtr &req) {
+    std::shared_ptr<Json::Value> validateJson(const HttpRequestPtr &req) {
         auto jsonObj = req->getJsonObject();
         if (!jsonObj) return nullptr;
         return jsonObj;
@@ -34,6 +36,9 @@ namespace {
 
 std::string hashPassword(const std::string &password) {
     return bcrypt::generateHash(password);
+}
+bool verifyPassword(const std::string &password, const std::string &hash) {
+    return bcrypt::validatePassword(password, hash);
 }
 
 
@@ -69,9 +74,11 @@ void AuthController::registerUser(const HttpRequestPtr &req, std::function<void(
     dbClient->execSqlAsync(
         "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)",
         [callback](const drogon::orm::Result &) {
-            callback(HttpResponse::newHttpJsonResponse({{"status", "success"}}));
+            Json::Value resp;
+            resp["status"] = "success";
+            callback(HttpResponse::newHttpJsonResponse(resp));
         },
-        [callback](const std::exception &) {
+        [callback](const drogon::orm::DrogonDbException &e) {
             callback(errorResponse("Error creating user", k500InternalServerError));
         },
         username, email, passwordHash
@@ -107,13 +114,13 @@ void AuthController::loginUser(const HttpRequestPtr &req, std::function<void(con
             auto accessToken = generateAccessToken(username);
             auto refreshToken = generateRefreshToken(username);
 
-            callback(HttpResponse::newHttpJsonResponse({
-                {"status", "success"},
-                {"access_token", accessToken},
-                {"refresh_token", refreshToken}
-            }));
+            Json::Value resp;
+            resp["status"] = "success";
+            resp["access_token"] = accessToken;
+            resp["refresh_token"] = refreshToken;
+            callback(HttpResponse::newHttpJsonResponse(resp));
         },
-        [callback](const std::exception &) {
+        [callback](const drogon::orm::DrogonDbException &e) {
             callback(errorResponse("Error logging in", k500InternalServerError));
         },
         username
@@ -127,8 +134,8 @@ std::string AuthController::generateAccessToken(const std::string &username)
     return jwt::create()
         .set_issuer("my_cppAuth")
         .set_subject(username)
-        .set_issued_at(system_clock::to_time_t(system_clock::now()))
-        .set_expires_at(system_clock::to_time_t(system_clock::now() + minutes{15}))
+        .set_issued_at(system_clock::now())
+        .set_expires_at(system_clock::now() + minutes{15})
         .sign(jwt::algorithm::hs256{jwtSecret});
 }
 
@@ -138,8 +145,8 @@ std::string AuthController::generateRefreshToken(const std::string &username)
     auto token = jwt::create()
         .set_issuer("my_cppAuth")
         .set_subject(username)
-        .set_issued_at(system_clock::to_time_t(system_clock::now()))
-        .set_expires_at(system_clock::to_time_t(system_clock::now() + hours{24*7}))
+        .set_issued_at(system_clock::now())
+        .set_expires_at(system_clock::now() + hours{24*7})
         .sign(jwt::algorithm::hs256{jwtSecret});
 
     std::lock_guard<std::mutex> lock(refreshMutex);
@@ -172,10 +179,10 @@ void AuthController::refreshToken(const HttpRequestPtr &req, std::function<void(
             .with_issuer("my_cppAuth")
             .verify(decoded);
 
-        callback(HttpResponse::newHttpJsonResponse({
-            {"access_token", generateAccessToken(username)},
-            {"refresh_token", generateRefreshToken(username)}
-        }));
+        Json::Value resp;
+        resp["access_token"] = generateAccessToken(username);
+        resp["refresh_token"] = generateRefreshToken(username);
+        callback(HttpResponse::newHttpJsonResponse(resp));
     }
     catch (...) {
         callback(errorResponse("Refresh token expired or invalid", k401Unauthorized));
@@ -185,7 +192,13 @@ void AuthController::refreshToken(const HttpRequestPtr &req, std::function<void(
 // ---------------------- Get Profile ----------------------
 void AuthController::getProfile(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    std::string username = req->getAttribute<std::string>("username"); // set by middleware
+    std::string username;
+    try {
+        username = req->attributes()->get<std::string>("username");
+    } catch (...) {
+        callback(errorResponse("Username attribute missing", k401Unauthorized));
+        return;
+    }
 
     dbClient->execSqlAsync(
         "SELECT id, username, email, created_at FROM users WHERE username=$1",
@@ -194,15 +207,14 @@ void AuthController::getProfile(const HttpRequestPtr &req, std::function<void(co
                 callback(errorResponse("User not found", k404NotFound));
                 return;
             }
-            json respJson = {
-                {"id", r[0]["id"].as<int>()},
-                {"username", r[0]["username"].as<std::string>()},
-                {"email", r[0]["email"].as<std::string>()},
-                {"created_at", r[0]["created_at"].as<std::string>()}
-            };
+            Json::Value respJson;
+            respJson["id"] = r[0]["id"].as<int>();
+            respJson["username"] = r[0]["username"].as<std::string>();
+            respJson["email"] = r[0]["email"].as<std::string>();
+            respJson["created_at"] = r[0]["created_at"].as<std::string>();
             callback(HttpResponse::newHttpJsonResponse(respJson));
         },
-        [callback](const std::exception &) {
+        [callback](const drogon::orm::DrogonDbException &e) {
             callback(errorResponse("Database error", k500InternalServerError));
         },
         username
