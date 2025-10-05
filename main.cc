@@ -23,20 +23,40 @@ int main() {
         std::string dbhost = std::getenv("DB_HOST") ? std::getenv("DB_HOST") : "localhost";
         std::string dbport = std::getenv("DB_PORT") ? std::getenv("DB_PORT") : "5432";
 
-        std::string connStr = "host=" + dbhost +
-                              " port=" + dbport +
-                              " dbname=" + dbname +
-                              " user=" + dbuser +
-                              " password=" + dbpass;
+        std::string dbDriver = std::getenv("DB_DRIVER") ? std::getenv("DB_DRIVER") : "postgresql";
 
-        // Create PostgreSQL client
-        dbClient = drogon::orm::DbClient::newPgClient(connStr, 1);
+        if (dbDriver == "sqlite3") {
+            std::string dbFile = std::getenv("DB_DATABASE") ? std::getenv("DB_DATABASE") : "./test.db";
+            dbClient = drogon::orm::DbClient::newSqlite3Client(dbFile, 1);
+            std::cout << "[INFO] Connected to SQLite at " << dbFile << std::endl;
+        } else if (dbDriver == "postgresql") {
+            std::string connStr = "host=" + dbhost +
+                                " port=" + dbport +
+                                " dbname=" + dbname +
+                                " user=" + dbuser +
+                                " password=" + dbpass;
+            dbClient = drogon::orm::DbClient::newPgClient(connStr, 1);
+            std::cout << "[INFO] Connected to PostgreSQL at " << dbhost << ":" << dbport << std::endl;
+        } else {
+            throw std::runtime_error("Unsupported DB_DRIVER: " + dbDriver);
+        }
 
-        std::cout << "[INFO] Connected to PostgreSQL at " << dbhost << ":" << dbport << std::endl;
+        // std::string connStr = "host=" + dbhost +
+        //                       " port=" + dbport +
+        //                       " dbname=" + dbname +
+        //                       " user=" + dbuser +
+        //                       " password=" + dbpass;
+
+        // std::string dbFile = std::getenv("DB_DATABASE") ? std::getenv("DB_DATABASE") : "./test.db";
+    
+        // // Create PostgreSQL client
+        // dbClient = drogon::orm::DbClient::newSqlite3Client(dbFile, 1);
+
+        // std::cout << "[INFO] Connected to PostgreSQL at " << dbhost << ":" << dbport << std::endl;
 
         // Start Drogon HTTP app
         drogon::app()
-            .addListener("0.0.0.0", 8080)
+            .addListener("0.0.0.0", 8087)
             .setThreadNum(2)
             .run();
 
