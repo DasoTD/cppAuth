@@ -1,3 +1,56 @@
+/*{
+    "configurations": [
+        {
+            "name": "Linux-Drogon-JWT",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/include",
+                "/usr/local/include",
+                "/home/xybuild/vcpkg/installed/x64-linux/include",
+                "/usr/include/postgresql",
+                "/usr/include/openssl",
+                "/usr/include/jwt-cpp",
+                "/home/xybuild/vcpkg/installed/x64-linux/include/jwt-cpp/jwt.h"
+
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-gcc-x64",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/**",
+                    "/usr/include",
+                    "/usr/local/include",
+                    "/home/xybuild/vcpkg/installed/x64-linux/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}
+
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",                      // your project headers
+                "/usr/include",                               // system headers
+                "/usr/local/include",                         // system headers
+                "/home/xybuild/vcpkg/installed/x64-linux/include" // vcpkg headers (Drogon, bcrypt, nlohmann/json, jwt-cpp)
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",                  // your compiler path
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}*/
 {
     "configurations": [
         {

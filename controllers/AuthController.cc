@@ -1,24 +1,38 @@
 #include "AuthController.h"
 #include <drogon/orm/DbClient.h>
 #include <nlohmann/json.hpp>
-#include <bcrypt/BCrypt.hpp>
 #include <chrono>
-#include <ctime>
-
+#include <drogon/drogon.h>
+#include <string>
+#include <functional>
 
 using json = nlohmann::json;
 
-extern drogon::orm::DbClientPtr dbClient; // We'll initialize in main.cpp
+extern drogon::orm::DbClientPtr dbClient; // Initialized in main.cpp
 
+// ---------------------- Helper Functions ----------------------
+namespace {
+    // Returns nullptr if JSON is invalid
+    std::shared_ptr<const drogon::HttpRequestJson> validateJson(const HttpRequestPtr &req) {
+        auto jsonObj = req->getJsonObject();
+        if (!jsonObj) return nullptr;
+        return jsonObj;
+    }
+
+    HttpResponsePtr errorResponse(const std::string &msg, HttpStatusCode code) {
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(code);
+        resp->setBody(msg);
+        return resp;
+    }
+}
+
+// ---------------------- Register User ----------------------
 void AuthController::registerUser(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    auto jsonReq = req->getJsonObject();
-    if (!jsonReq)
-    {
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k400BadRequest);
-        resp->setBody("Invalid JSON");
-        callback(resp);
+    auto jsonReq = validateJson(req);
+    if (!jsonReq) {
+        callback(errorResponse("Invalid JSON", k400BadRequest));
         return;
     }
 
@@ -26,33 +40,26 @@ void AuthController::registerUser(const HttpRequestPtr &req, std::function<void(
     std::string email = (*jsonReq)["email"].asString();
     std::string password = (*jsonReq)["password"].asString();
 
-    std::string passwordHash = BCrypt::generateHash(password);
+    std::string passwordHash = hashPassword(password);
 
     dbClient->execSqlAsync(
         "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)",
-        [callback](const drogon::orm::Result &r) {
-            auto resp = HttpResponse::newHttpJsonResponse({{"status", "success"}});
-            callback(resp);
+        [callback](const drogon::orm::Result &) {
+            callback(HttpResponse::newHttpJsonResponse({{"status", "success"}}));
         },
-        [callback](const std::exception &e) {
-            auto resp = HttpResponse::newHttpResponse();
-            resp->setStatusCode(k500InternalServerError);
-            resp->setBody("Error creating user");
-            callback(resp);
+        [callback](const std::exception &) {
+            callback(errorResponse("Error creating user", k500InternalServerError));
         },
         username, email, passwordHash
     );
 }
 
+// ---------------------- Login User ----------------------
 void AuthController::loginUser(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    auto jsonReq = req->getJsonObject();
-    if (!jsonReq)
-    {
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k400BadRequest);
-        resp->setBody("Invalid JSON");
-        callback(resp);
+    auto jsonReq = validateJson(req);
+    if (!jsonReq) {
+        callback(errorResponse("Invalid JSON", k400BadRequest));
         return;
     }
 
@@ -61,71 +68,54 @@ void AuthController::loginUser(const HttpRequestPtr &req, std::function<void(con
 
     dbClient->execSqlAsync(
         "SELECT password_hash FROM users WHERE username=$1",
-        [callback, password](const drogon::orm::Result &r) {
-            if (r.size() == 0)
-            {
-                auto resp = HttpResponse::newHttpResponse();
-                resp->setStatusCode(k401Unauthorized);
-                resp->setBody("User not found");
-                callback(resp);
+        [this, callback, password, username](const drogon::orm::Result &r) {
+            if (r.empty()) {
+                callback(errorResponse("User not found", k401Unauthorized));
                 return;
             }
 
             std::string storedHash = r[0]["password_hash"].as<std::string>();
-            if (BCrypt::validatePassword(password, storedHash))
-            {
-                auto accessToken = generateAccessToken(username);
-                auto refreshToken = generateRefreshToken(username);
-
-                auto respJson = json{
-                    {"status", "success"},
-                    {"access_token", accessToken},
-                    {"refresh_token", refreshToken}
-                };
-                callback(HttpResponse::newHttpJsonResponse(respJson));
+            if (!verifyPassword(password, storedHash)) {
+                callback(errorResponse("Invalid password", k401Unauthorized));
+                return;
             }
 
-            // if (BCrypt::validatePassword(password, storedHash))
-            // {
-            //     auto resp = HttpResponse::newHttpJsonResponse({{"status", "success"}});
-            //     callback(resp);
-            // }
-            else
-            {
-                auto resp = HttpResponse::newHttpResponse();
-                resp->setStatusCode(k401Unauthorized);
-                resp->setBody("Invalid password");
-                callback(resp);
-            }
+            auto accessToken = generateAccessToken(username);
+            auto refreshToken = generateRefreshToken(username);
+
+            callback(HttpResponse::newHttpJsonResponse({
+                {"status", "success"},
+                {"access_token", accessToken},
+                {"refresh_token", refreshToken}
+            }));
         },
-        [callback](const std::exception &e) {
-            auto resp = HttpResponse::newHttpResponse();
-            resp->setStatusCode(k500InternalServerError);
-            resp->setBody("Error logging in");
-            callback(resp);
+        [callback](const std::exception &) {
+            callback(errorResponse("Error logging in", k500InternalServerError));
         },
         username
     );
 }
 
-std::string AuthController::generateAccessToken(const std::string &username) {
+// ---------------------- JWT Tokens ----------------------
+std::string AuthController::generateAccessToken(const std::string &username)
+{
     using namespace std::chrono;
-    auto token = jwt::create()
-        .set_issuer("my_drogon_app")
+    return jwt::create()
+        .set_issuer("my_cppAuth")
         .set_subject(username)
         .set_issued_at(system_clock::to_time_t(system_clock::now()))
         .set_expires_at(system_clock::to_time_t(system_clock::now() + minutes{15}))
         .sign(jwt::algorithm::hs256{jwtSecret});
-    return token;
 }
 
-std::string AuthController::generateRefreshToken(const std::string &username) {
+std::string AuthController::generateRefreshToken(const std::string &username)
+{
     using namespace std::chrono;
     auto token = jwt::create()
-        .set_issuer("my_drogon_app")
+        .set_issuer("my_cppAuth")
         .set_subject(username)
         .set_issued_at(system_clock::to_time_t(system_clock::now()))
-        .set_expires_at(system_clock::to_time_t(system_clock::now() + hours{24*7})) // 7 days
+        .set_expires_at(system_clock::to_time_t(system_clock::now() + hours{24*7}))
         .sign(jwt::algorithm::hs256{jwtSecret});
 
     std::lock_guard<std::mutex> lock(refreshMutex);
@@ -133,11 +123,12 @@ std::string AuthController::generateRefreshToken(const std::string &username) {
     return token;
 }
 
-
-void AuthController::refreshToken(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
-    auto jsonReq = req->getJsonObject();
+// ---------------------- Refresh Token ----------------------
+void AuthController::refreshToken(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback)
+{
+    auto jsonReq = validateJson(req);
     if (!jsonReq) {
-        callback(HttpResponse::newHttpResponse(k400BadRequest, "Invalid JSON"));
+        callback(errorResponse("Invalid JSON", k400BadRequest));
         return;
     }
 
@@ -146,39 +137,37 @@ void AuthController::refreshToken(const HttpRequestPtr &req, std::function<void(
 
     std::lock_guard<std::mutex> lock(refreshMutex);
     if (refreshTokens.find(username) == refreshTokens.end() || refreshTokens[username] != oldToken) {
-        callback(HttpResponse::newHttpResponse(k401Unauthorized, "Invalid refresh token"));
+        callback(errorResponse("Invalid refresh token", k401Unauthorized));
         return;
     }
 
-    // Verify JWT
     try {
         auto decoded = jwt::decode(oldToken);
-        auto verifier = jwt::verify()
+        jwt::verify()
             .allow_algorithm(jwt::algorithm::hs256{jwtSecret})
-            .with_issuer("my_drogon_app");
-        verifier.verify(decoded);
+            .with_issuer("my_cppAuth")
+            .verify(decoded);
 
-        auto newAccess = generateAccessToken(username);
-        auto newRefresh = generateRefreshToken(username); // rotates the token
-
-        auto respJson = json{
-            {"access_token", newAccess},
-            {"refresh_token", newRefresh}
-        };
-        callback(HttpResponse::newHttpJsonResponse(respJson));
-    } catch (const std::exception &e) {
-        callback(HttpResponse::newHttpResponse(k401Unauthorized, "Refresh token expired or invalid"));
+        callback(HttpResponse::newHttpJsonResponse({
+            {"access_token", generateAccessToken(username)},
+            {"refresh_token", generateRefreshToken(username)}
+        }));
+    }
+    catch (...) {
+        callback(errorResponse("Refresh token expired or invalid", k401Unauthorized));
     }
 }
 
-void AuthController::getProfile(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+// ---------------------- Get Profile ----------------------
+void AuthController::getProfile(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback)
+{
     std::string username = req->getAttribute<std::string>("username"); // set by middleware
 
     dbClient->execSqlAsync(
         "SELECT id, username, email, created_at FROM users WHERE username=$1",
         [callback](const drogon::orm::Result &r) {
             if (r.empty()) {
-                callback(HttpResponse::newHttpResponse(k404NotFound, "User not found"));
+                callback(errorResponse("User not found", k404NotFound));
                 return;
             }
             json respJson = {
@@ -189,10 +178,9 @@ void AuthController::getProfile(const HttpRequestPtr &req, std::function<void(co
             };
             callback(HttpResponse::newHttpJsonResponse(respJson));
         },
-        [callback](const std::exception &e) {
-            callback(HttpResponse::newHttpResponse(k500InternalServerError, "Database error"));
+        [callback](const std::exception &) {
+            callback(errorResponse("Database error", k500InternalServerError));
         },
         username
     );
 }
-

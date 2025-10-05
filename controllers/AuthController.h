@@ -1,9 +1,14 @@
 #pragma once
 #include <drogon/HttpController.h>
-#include <bcrypt/BCrypt.hpp> // Commented out because libbcrypt-dev is unavailable
 #include <jwt-cpp/jwt.h>
 #include <unordered_map>
 #include <mutex>
+#include <string>
+
+
+
+// Include Bcrypt.cpp header for password hashing
+#include "external/Bcrypt.cpp/include/bcrypt.h"
 
 using namespace drogon;
 
@@ -24,8 +29,18 @@ public:
 private:
     std::unordered_map<std::string, std::string> refreshTokens; // username -> refresh token
     std::mutex refreshMutex;
-    std::string jwtSecret = "supersecretkey"; // change this to env var in production
+    std::string jwtSecret = "supersecretkey"; // TODO: move to env var in production
 
+    // JWT helper functions
     std::string generateAccessToken(const std::string &username);
     std::string generateRefreshToken(const std::string &username);
+
+    // Optional: you can add inline wrappers for bcrypt here
+    inline std::string hashPassword(const std::string &password) {
+        return bcrypt::generateHash(password);
+    }
+
+    inline bool verifyPassword(const std::string &password, const std::string &hash) {
+        return bcrypt::validatePassword(password, hash);
+    }
 };

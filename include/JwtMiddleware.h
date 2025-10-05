@@ -29,7 +29,7 @@ public:
             auto decoded = jwt::decode(token);
             auto verifier = jwt::verify()
                 .allow_algorithm(jwt::algorithm::hs256{jwtSecret})
-                .with_issuer("my_drogon_app");
+                .with_issuer("my_cppAuth");
             verifier.verify(decoded);
 
             // Pass username to request attributes

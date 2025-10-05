@@ -1,23 +1,64 @@
 #include <drogon/drogon.h>
-#include "controllers/AuthController.h"
-#include "JwtMiddleware.h"
+#include <drogon/orm/DbClient.h>
+#include <drogon/orm/DbTypes.h>
+#include <cstdlib>
+#include <iostream>
+#include "AuthController.h"
 
-using namespace drogon;
+// Global database client pointer
+drogon::orm::DbClientPtr dbClient;
 
-orm::DbClientPtr dbClient;
+// Helper to read env variables with a fallback
+std::string getEnvVar(const std::string &key, const std::string &defaultVal = "") {
+    const char *val = std::getenv(key.c_str());
+    return val ? std::string(val) : defaultVal;
+}
 
 int main() {
-    dbClient = drogon::orm::DbClient::newPgClient(
-        "dbname=yourdb user=youruser password=yourpass host=127.0.0.1 port=5432", 4
-    );
+    try {
+        // ---------------------- Load Environment Variables ----------------------
+        std::string dbName = getEnvVar("DB_NAME", "mydb");
+        std::string dbUser = getEnvVar("DB_USER", "postgres");
+        std::string dbPass = getEnvVar("DB_PASS", "password");
+        std::string dbHost = getEnvVar("DB_HOST", "127.0.0.1");
+        std::string dbPort = getEnvVar("DB_PORT", "5432");
 
-    auto authController = std::make_shared<AuthController>();
-    drogon::app().registerController(authController);
+        std::string jwtSecret = getEnvVar("JWT_SECRET", "supersecretkey"); 
+        // You can pass this secret into AuthController if you modify its constructor to accept it
 
-    // Register JWT middleware for all routes under /api
-    drogon::app().registerFilter(std::make_shared<JwtMiddleware>(), "/api/*");
+        // ---------------------- Initialize Database ----------------------
+        std::string dbConnStr = "dbname=" + dbName +
+                                " user=" + dbUser +
+                                " password=" + dbPass +
+                                " host=" + dbHost +
+                                " port=" + dbPort;
 
-    drogon::app().run();
+        dbClient = drogon::orm::DbClient::newPgClient(dbConnStr, 1 /* pool size */);
+
+        std::cout << "[INFO] PostgreSQL database connected successfully!" << std::endl;
+
+        // Optional test query
+        dbClient->execSqlAsync(
+            "SELECT NOW()",
+            [](const drogon::orm::Result &r) {
+                std::cout << "[INFO] DB Test Query Result: " << r[0]["now"].as<std::string>() << std::endl;
+            },
+            [](const std::exception &e) {
+                std::cerr << "[ERROR] DB Test Query Failed: " << e.what() << std::endl;
+            }
+        );
+
+        // ---------------------- Start Drogon App ----------------------
+        drogon::app()
+            .registerController(std::make_shared<AuthController>()) // Register controller
+            .addListener("0.0.0.0", 8080)                             // Listen on all interfaces
+            .run();
+
+    } catch (const std::exception &e) {
+        std::cerr << "[ERROR] Exception in main: " << e.what() << std::endl;
+        return 1;
+    }
+
     return 0;
 }
 

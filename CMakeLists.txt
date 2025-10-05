@@ -1,11 +1,14 @@
 find_package(Drogon CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
-add_executable(my_drogon_app main.cpp controllers/AuthController.cc)
-target_link_libraries(my_drogon_app PRIVATE Drogon::Drogon nlohmann_json::nlohmann_json)
-target_link_libraries(my_drogon_app PRIVATE bcrypt jwt-cpp)
-target_include_directories(my_drogon_app PRIVATE /usr/include/bcrypt /usr/include/jwt-cpp)
-target_include_directories(my_drogon_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/controllers)
+add_executable(my_cppAuth main.cpp controllers/AuthController.cc)
+target_link_libraries(my_cppAuth PRIVATE Drogon::Drogon nlohmann_json::nlohmann_json)
+target_link_libraries(my_cppAuth PRIVATE bcrypt jwt-cpp)
+target_include_directories(my_cppAuth PRIVATE /usr/include/bcrypt /usr/include/jwt-cpp)
+target_include_directories(my_cppAuth PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/controllers)
+include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
+find_package(nlohmann_json 3.2.0 REQUIRED) 
+#target_link_libraries(your_target_name PRIVATE nlohmann_json::nlohmann_json)
 #r_target PRIVATE external/jwt-cpp/include
 
 
