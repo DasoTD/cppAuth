@@ -171,3 +171,28 @@ void AuthController::refreshToken(const HttpRequestPtr &req, std::function<void(
     }
 }
 
+void AuthController::getProfile(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+    std::string username = req->getAttribute<std::string>("username"); // set by middleware
+
+    dbClient->execSqlAsync(
+        "SELECT id, username, email, created_at FROM users WHERE username=$1",
+        [callback](const drogon::orm::Result &r) {
+            if (r.empty()) {
+                callback(HttpResponse::newHttpResponse(k404NotFound, "User not found"));
+                return;
+            }
+            json respJson = {
+                {"id", r[0]["id"].as<int>()},
+                {"username", r[0]["username"].as<std::string>()},
+                {"email", r[0]["email"].as<std::string>()},
+                {"created_at", r[0]["created_at"].as<std::string>()}
+            };
+            callback(HttpResponse::newHttpJsonResponse(respJson));
+        },
+        [callback](const std::exception &e) {
+            callback(HttpResponse::newHttpResponse(k500InternalServerError, "Database error"));
+        },
+        username
+    );
+}
+
