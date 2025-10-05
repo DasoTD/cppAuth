@@ -1,16 +1,50 @@
 {
     "configurations": [
         {
-            "name": "Linux",
+            "name": "Linux-Drogon-JWT",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",                                 // your project headers: include/, controllers/, models/
+                "/usr/include",                                          // standard system headers
+                "/usr/local/include",                                    // system-wide headers (Drogon may be here)
+                "/home/xybuild/vcpkg/installed/x64-linux/include",      // vcpkg headers (Drogon, bcrypt, nlohmann/json, jwt-cpp)
+                "/usr/include/postgresql",                               // if using PostgreSQL dev headers
+                "/usr/include/openssl"                                   // OpenSSL headers for JWT signing
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/gcc",
+            "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
-            "cppStandard": "gnu++17",
-            "intelliSenseMode": "linux-gcc-x64"
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-gcc-x64",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/**",
+                    "/usr/include",
+                    "/usr/local/include",
+                    "/home/xybuild/vcpkg/installed/x64-linux/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
         }
     ],
     "version": 4
 }
+
+
+// {
+//     "configurations": [
+//         {
+//             "name": "Linux",
+//             "includePath": [
+//                 "${workspaceFolder}/**",
+//                 "/usr/include",
+//                 "/usr/local/include"
+//             ],
+//             "defines": [],
+//             "compilerPath": "/usr/bin/gcc",
+//             "cStandard": "c23",
+//             "cppStandard": "c++23",
+//             "intelliSenseMode": "linux-gcc-x64"
+//         }
+//     ],
+//     "version": 4
+// }
