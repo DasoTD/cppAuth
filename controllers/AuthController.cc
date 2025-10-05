@@ -7,6 +7,9 @@
 #include <string>
 #include <functional>
 #include "AuthController.h"
+#include "AuthController.h"
+#include <cstdlib>
+#include <iostream>
 
 using json = nlohmann::json;
 
@@ -33,16 +36,19 @@ std::string hashPassword(const std::string &password) {
     return bcrypt::generateHash(password);
 }
 
+
+
 AuthController::AuthController() {
     const char *envSecret = std::getenv("JWT_SECRET");
-    if (envSecret) {
+    if (envSecret && std::string(envSecret).size() > 0) {
         jwtSecret = envSecret;
-        std::cout << "[INFO] Loaded JWT_SECRET from environment." << std::endl;
+        std::cout << "[INFO] JWT_SECRET loaded from .env file." << std::endl;
     } else {
-        jwtSecret = "supersecretkey"; // fallback
+        jwtSecret = "default_secret_key";
         std::cerr << "[WARN] JWT_SECRET not set. Using fallback secret!" << std::endl;
     }
 }
+
 
 
 // ---------------------- Register User ----------------------

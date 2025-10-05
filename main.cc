@@ -1,37 +1,39 @@
 #include <drogon/drogon.h>
-#include <dotenv.h> // include dotenv-cpp
-
+#include <drogon/orm/DbClient.h>
+#include <dotenv.h>
 #include <iostream>
 
 using namespace drogon;
 using namespace dotenv;
 
+drogon::orm::DbClientPtr dbClient;
+
 int main() {
     try {
-        // Load .env file from project root
+        // Load .env from project root
         dotenv::init();
 
-        // Log confirmation
-        std::cout << "[INFO] Environment variables loaded from .env file" << std::endl;
+        std::cout << "[INFO] .env file loaded successfully.\n";
 
-        // Get environment vars for DB
+        // Fetch DB connection details from environment
         std::string dbname = std::getenv("DB_NAME") ? std::getenv("DB_NAME") : "cppauth";
         std::string dbuser = std::getenv("DB_USER") ? std::getenv("DB_USER") : "postgres";
         std::string dbpass = std::getenv("DB_PASS") ? std::getenv("DB_PASS") : "";
         std::string dbhost = std::getenv("DB_HOST") ? std::getenv("DB_HOST") : "localhost";
         std::string dbport = std::getenv("DB_PORT") ? std::getenv("DB_PORT") : "5432";
 
-        // Create DB connection string
-        std::string connStr = "host=" + dbhost + " port=" + dbport +
-                              " dbname=" + dbname + " user=" + dbuser +
+        std::string connStr = "host=" + dbhost +
+                              " port=" + dbport +
+                              " dbname=" + dbname +
+                              " user=" + dbuser +
                               " password=" + dbpass;
 
-        auto dbClient = drogon::orm::DbClient::newPgClient(connStr, 1);
-        drogon::app().getLoop()->queueInLoop([dbClient]() {
-            std::cout << "[INFO] Connected to PostgreSQL successfully" << std::endl;
-        });
+        // Create PostgreSQL client
+        dbClient = drogon::orm::DbClient::newPgClient(connStr, 1);
 
-        // Drogon setup
+        std::cout << "[INFO] Connected to PostgreSQL at " << dbhost << ":" << dbport << std::endl;
+
+        // Start Drogon HTTP app
         drogon::app()
             .addListener("0.0.0.0", 8080)
             .setThreadNum(2)

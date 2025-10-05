@@ -63,7 +63,8 @@
                 "/usr/include/postgresql",
                 "/usr/include/openssl",
                 "/usr/include/jwt-cpp",
-                "/home/xybuild/vcpkg/installed/x64-linux/include/jwt-cpp/jwt.h"
+                "/home/xybuild/vcpkg/installed/x64-linux/include/jwt-cpp/jwt.h",
+                "${workspaceFolder}/external/dotenv-cpp/include"
 
             ],
             "defines": [],

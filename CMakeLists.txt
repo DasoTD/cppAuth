@@ -12,6 +12,51 @@ find_package(dotenv-cpp CONFIG REQUIRED)
 target_link_libraries(my_cppAuth PRIVATE dotenv-cpp)
 target_link_libraries(my_cppAuth PRIVATE nlohmann_json::nlohmann_json)
 #r_target PRIVATE external/jwt-cpp/include
+include_directories(${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include)
+
+
+cmake_minimum_required(VERSION 3.16)
+project(cppAuth)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Drogon
+find_package(Drogon CONFIG REQUIRED)
+
+# PostgreSQL
+find_package(PostgreSQL REQUIRED)
+include_directories(${PostgreSQL_INCLUDE_DIRS})
+
+# JWT-CPP
+find_path(JWT_CPP_INCLUDE_DIR jwt-cpp/jwt.h)
+include_directories(${JWT_CPP_INCLUDE_DIR})
+
+# dotenv-cpp (header-only)
+include_directories(${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include)
+
+# bcrypt
+include_directories(${CMAKE_SOURCE_DIR}/external/bcrypt/include)
+
+# Source files
+file(GLOB_RECURSE SRC_FILES
+    "${CMAKE_SOURCE_DIR}/*.cc"
+    "${CMAKE_SOURCE_DIR}/controllers/*.cc"
+)
+
+add_executable(${PROJECT_NAME} ${SRC_FILES})
+
+# Link Drogon and PostgreSQL
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE Drogon::Drogon
+    PRIVATE ${PostgreSQL_LIBRARIES}
+)
+
+# Output binary to project root (optional)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 
 
 
