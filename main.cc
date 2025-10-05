@@ -1,77 +1,45 @@
 #include <drogon/drogon.h>
-#include <drogon/orm/DbClient.h>
-#include <drogon/orm/DbTypes.h>
-#include <cstdlib>
+#include <dotenv.h> // include dotenv-cpp
+
 #include <iostream>
-#include "AuthController.h"
 
-// Global database client pointer
-drogon::orm::DbClientPtr dbClient;
-
-// Helper to read env variables with a fallback
-std::string getEnvVar(const std::string &key, const std::string &defaultVal = "") {
-    const char *val = std::getenv(key.c_str());
-    return val ? std::string(val) : defaultVal;
-}
+using namespace drogon;
+using namespace dotenv;
 
 int main() {
     try {
-        // ---------------------- Load Environment Variables ----------------------
-        std::string dbName = getEnvVar("DB_NAME", "mydb");
-        std::string dbUser = getEnvVar("DB_USER", "postgres");
-        std::string dbPass = getEnvVar("DB_PASS", "password");
-        std::string dbHost = getEnvVar("DB_HOST", "127.0.0.1");
-        std::string dbPort = getEnvVar("DB_PORT", "5432");
+        // Load .env file from project root
+        dotenv::init();
 
-        std::string jwtSecret = getEnvVar("JWT_SECRET", "supersecretkey"); 
-        // You can pass this secret into AuthController if you modify its constructor to accept it
+        // Log confirmation
+        std::cout << "[INFO] Environment variables loaded from .env file" << std::endl;
 
-        // ---------------------- Initialize Database ----------------------
-        std::string dbConnStr = "dbname=" + dbName +
-                                " user=" + dbUser +
-                                " password=" + dbPass +
-                                " host=" + dbHost +
-                                " port=" + dbPort;
+        // Get environment vars for DB
+        std::string dbname = std::getenv("DB_NAME") ? std::getenv("DB_NAME") : "cppauth";
+        std::string dbuser = std::getenv("DB_USER") ? std::getenv("DB_USER") : "postgres";
+        std::string dbpass = std::getenv("DB_PASS") ? std::getenv("DB_PASS") : "";
+        std::string dbhost = std::getenv("DB_HOST") ? std::getenv("DB_HOST") : "localhost";
+        std::string dbport = std::getenv("DB_PORT") ? std::getenv("DB_PORT") : "5432";
 
-        dbClient = drogon::orm::DbClient::newPgClient(dbConnStr, 1 /* pool size */);
+        // Create DB connection string
+        std::string connStr = "host=" + dbhost + " port=" + dbport +
+                              " dbname=" + dbname + " user=" + dbuser +
+                              " password=" + dbpass;
 
-        std::cout << "[INFO] PostgreSQL database connected successfully!" << std::endl;
+        auto dbClient = drogon::orm::DbClient::newPgClient(connStr, 1);
+        drogon::app().getLoop()->queueInLoop([dbClient]() {
+            std::cout << "[INFO] Connected to PostgreSQL successfully" << std::endl;
+        });
 
-        // Optional test query
-        dbClient->execSqlAsync(
-            "SELECT NOW()",
-            [](const drogon::orm::Result &r) {
-                std::cout << "[INFO] DB Test Query Result: " << r[0]["now"].as<std::string>() << std::endl;
-            },
-            [](const std::exception &e) {
-                std::cerr << "[ERROR] DB Test Query Failed: " << e.what() << std::endl;
-            }
-        );
-
-        // ---------------------- Start Drogon App ----------------------
+        // Drogon setup
         drogon::app()
-            .registerController(std::make_shared<AuthController>()) // Register controller
-            .addListener("0.0.0.0", 8080)                             // Listen on all interfaces
+            .addListener("0.0.0.0", 8080)
+            .setThreadNum(2)
             .run();
 
     } catch (const std::exception &e) {
-        std::cerr << "[ERROR] Exception in main: " << e.what() << std::endl;
-        return 1;
+        std::cerr << "[ERROR] " << e.what() << std::endl;
     }
 
     return 0;
 }
-
-
-
-// #include <drogon/drogon.h>
-// int main() {
-//     //Set HTTP listener address and port
-//     drogon::app().addListener("0.0.0.0", 5555);
-//     //Load config file
-//     //drogon::app().loadConfigFile("../config.json");
-//     //drogon::app().loadConfigFile("../config.yaml");
-//     //Run HTTP framework,the method will block in the internal event loop
-//     drogon::app().run();
-//     return 0;
-// }

@@ -8,7 +8,9 @@ target_include_directories(my_cppAuth PRIVATE /usr/include/bcrypt /usr/include/j
 target_include_directories(my_cppAuth PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/controllers)
 include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
 find_package(nlohmann_json 3.2.0 REQUIRED) 
-#target_link_libraries(your_target_name PRIVATE nlohmann_json::nlohmann_json)
+find_package(dotenv-cpp CONFIG REQUIRED)
+target_link_libraries(my_cppAuth PRIVATE dotenv-cpp)
+target_link_libraries(my_cppAuth PRIVATE nlohmann_json::nlohmann_json)
 #r_target PRIVATE external/jwt-cpp/include
 
 

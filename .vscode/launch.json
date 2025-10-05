@@ -9,6 +9,7 @@
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
+            "envFile": "${workspaceFolder}/.env",
             "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [

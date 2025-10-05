@@ -1,19 +1,18 @@
 #pragma once
 #include <drogon/HttpController.h>
+#include "Bcrypt.cpp/include/bcrypt.h"
 #include <jwt-cpp/jwt.h>
 #include <unordered_map>
 #include <mutex>
+#include <cstdlib> // for getenv
 #include <string>
-
-
-
-// Include Bcrypt.cpp header for password hashing
-#include "external/Bcrypt.cpp/include/bcrypt.h"
 
 using namespace drogon;
 
 class AuthController : public drogon::HttpController<AuthController> {
 public:
+    AuthController(); // Constructor declaration
+
     METHOD_LIST_BEGIN
     ADD_METHOD_TO(AuthController::registerUser, "/register", Post);
     ADD_METHOD_TO(AuthController::loginUser, "/login", Post);
@@ -29,18 +28,8 @@ public:
 private:
     std::unordered_map<std::string, std::string> refreshTokens; // username -> refresh token
     std::mutex refreshMutex;
-    std::string jwtSecret = "supersecretkey"; // TODO: move to env var in production
+    std::string jwtSecret; // no longer hardcoded
 
-    // JWT helper functions
     std::string generateAccessToken(const std::string &username);
     std::string generateRefreshToken(const std::string &username);
-
-    // Optional: you can add inline wrappers for bcrypt here
-    inline std::string hashPassword(const std::string &password) {
-        return bcrypt::generateHash(password);
-    }
-
-    inline bool verifyPassword(const std::string &password, const std::string &hash) {
-        return bcrypt::validatePassword(password, hash);
-    }
 };

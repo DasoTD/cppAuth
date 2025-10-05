@@ -1,10 +1,12 @@
 #include "AuthController.h"
 #include <drogon/orm/DbClient.h>
+#include <drogon/orm/DbTypes.h>
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <drogon/drogon.h>
 #include <string>
 #include <functional>
+#include "AuthController.h"
 
 using json = nlohmann::json;
 
@@ -26,6 +28,22 @@ namespace {
         return resp;
     }
 }
+
+std::string hashPassword(const std::string &password) {
+    return bcrypt::generateHash(password);
+}
+
+AuthController::AuthController() {
+    const char *envSecret = std::getenv("JWT_SECRET");
+    if (envSecret) {
+        jwtSecret = envSecret;
+        std::cout << "[INFO] Loaded JWT_SECRET from environment." << std::endl;
+    } else {
+        jwtSecret = "supersecretkey"; // fallback
+        std::cerr << "[WARN] JWT_SECRET not set. Using fallback secret!" << std::endl;
+    }
+}
+
 
 // ---------------------- Register User ----------------------
 void AuthController::registerUser(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback)
