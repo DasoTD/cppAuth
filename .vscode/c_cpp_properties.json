@@ -3,12 +3,15 @@
         {
             "name": "Linux-Drogon-JWT",
             "includePath": [
-                "${workspaceFolder}/**",                                 // your project headers: include/, controllers/, models/
-                "/usr/include",                                          // standard system headers
-                "/usr/local/include",                                    // system-wide headers (Drogon may be here)
-                "/home/xybuild/vcpkg/installed/x64-linux/include",      // vcpkg headers (Drogon, bcrypt, nlohmann/json, jwt-cpp)
-                "/usr/include/postgresql",                               // if using PostgreSQL dev headers
-                "/usr/include/openssl"                                   // OpenSSL headers for JWT signing
+                "${workspaceFolder}/**",
+                "/usr/include",
+                "/usr/local/include",
+                "/home/xybuild/vcpkg/installed/x64-linux/include",
+                "/usr/include/postgresql",
+                "/usr/include/openssl",
+                "/usr/include/jwt-cpp",
+                "/home/xybuild/vcpkg/installed/x64-linux/include/jwt-cpp/jwt.h"
+
             ],
             "defines": [],
             "compilerPath": "/usr/bin/g++",
@@ -28,23 +31,3 @@
     ],
     "version": 4
 }
-
-
-// {
-//     "configurations": [
-//         {
-//             "name": "Linux",
-//             "includePath": [
-//                 "${workspaceFolder}/**",
-//                 "/usr/include",
-//                 "/usr/local/include"
-//             ],
-//             "defines": [],
-//             "compilerPath": "/usr/bin/gcc",
-//             "cStandard": "c23",
-//             "cppStandard": "c++23",
-//             "intelliSenseMode": "linux-gcc-x64"
-//         }
-//     ],
-//     "version": 4
-// }
