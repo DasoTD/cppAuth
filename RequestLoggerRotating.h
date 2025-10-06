@@ -1,41 +1,39 @@
 #pragma once
 #include <drogon/HttpFilter.h>
-#include "LoggerBase.h"
+#include <drogon/HttpRequest.h>
+#include <drogon/HttpResponse.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <chrono>
 
-class RequestLoggerRotating : public drogon::HttpFilter<RequestLoggerRotating>, public LoggerBase
+class RequestLoggerRotating : public drogon::HttpFilter<RequestLoggerRotating>
 {
 public:
-    RequestLoggerRotating() : LoggerBase("request_log") {}
+    RequestLoggerRotating()
+    {
+        logger_ = spdlog::rotating_logger_mt("api_logger", "logs/api.log", 1024*1024*5, 3);
+        logger_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
+        logger_->flush_on(spdlog::level::info);
+    }
 
     void doFilter(const drogon::HttpRequestPtr &req,
-                  drogon::FilterCallback &&fcb) override
+                  std::function<void (const drogon::HttpResponsePtr &)> &&f,
+                  FilterCallback &&fc) override
     {
-        auto start = std::chrono::system_clock::now();
+        auto start = std::chrono::steady_clock::now();
+        auto path = req->path();
+        auto method = req->methodString();
 
-        auto respCallback = [this, req, start, fcb](const drogon::HttpResponsePtr &resp) {
-            logRequest(req, resp, start);
-            fcb(resp);
-        };
+        fc([start, path, method, f, this](const drogon::HttpResponsePtr &resp) {
+            auto end = std::chrono::steady_clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-        nextFilter(req, std::move(respCallback));
+            logger_->info("{} {} => {} ({}ms)", method, path, static_cast<int>(resp->getStatusCode()), ms);
+
+            f(resp); // continue the chain
+        });
     }
 
 private:
-    void logRequest(const drogon::HttpRequestPtr &req,
-                    const drogon::HttpResponsePtr &resp,
-                    const std::chrono::system_clock::time_point &start)
-    {
-        nlohmann::json entry;
-        auto t = std::chrono::system_clock::to_time_t(start);
-        std::stringstream ts;
-        ts << std::put_time(std::localtime(&t), "%Y-%m-%dT%H:%M:%S");
-
-        entry["timestamp"] = ts.str();
-        entry["method"] = req->methodString();
-        entry["path"] = req->path();
-        entry["query"] = req->query();
-        entry["status"] = resp->statusCode();
-
-        writeJson(entry);
-    }
+    std::shared_ptr<spdlog::logger> logger_;
 };
