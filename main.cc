@@ -1,8 +1,12 @@
 #include <drogon/drogon.h>
 #include <drogon/orm/DbClient.h>
-//#include <dotenv.h>
+#include <drogon/drogon.h>
+#include <trantor/utils/Logger.h>
 #include <laserpants/dotenv/dotenv.h>
 #include <iostream>
+#include <trantor/utils/Logger.h>
+#include "ApiLoggerFilter.h"
+
 
 using namespace drogon;
 
@@ -15,7 +19,13 @@ int main() {
         dotenv::init();
 
         std::cout << "[INFO] .env file loaded successfully.\n";
+        system("mkdir -p logs"); 
 
+    //     // Set the log path for Trantor
+    //    auto asyncLogger = std::make_shared<trantor::AsyncFileLogger>("logs/cppAuth.log", 1024 * 1024);
+    //     asyncLogger->start();
+        
+        
         // Fetch DB connection details from environment
         std::string dbname = std::getenv("DB_NAME") ? std::getenv("DB_NAME") : "cppauth";
         std::string dbuser = std::getenv("DB_USER") ? std::getenv("DB_USER") : "postgres";
@@ -55,6 +65,7 @@ int main() {
         // std::cout << "[INFO] Connected to PostgreSQL at " << dbhost << ":" << dbport << std::endl;
 
         // Start Drogon HTTP app
+        drogon::app().registerFilter(std::make_shared<ApiLoggerFilter>());
         drogon::app()
             .addListener("0.0.0.0", 8087)
             .setThreadNum(2)
