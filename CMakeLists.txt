@@ -25,6 +25,8 @@ include_directories(${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/include)
 
 # jwt-cpp (header-only)
 include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
 
 # JsonCpp (required by Drogon)
 set(JSONCPP_INCLUDE_DIRS "/usr/include/jsoncpp")
