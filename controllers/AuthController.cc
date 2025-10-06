@@ -41,10 +41,9 @@
 #include <drogon/drogon.h>
 #include <string>
 #include <functional>
-#include "AuthController.h"
-#include "AuthController.h"
 #include <cstdlib>
 #include <iostream>
+#include <bcrypt/BCrypt.hpp>
 
 using json = nlohmann::json;
 
@@ -69,10 +68,12 @@ namespace {
 }
 
 std::string hashPassword(const std::string &password) {
-    return bcrypt::generateHash(password);
+    // Use the BCrypt wrapper class provided by the bundled libbcrypt
+    return BCrypt::generateHash(password);
 }
+
 bool verifyPassword(const std::string &password, const std::string &hash) {
-    return bcrypt::validatePassword(password, hash);
+    return BCrypt::validatePassword(password, hash);
 }
 
 
@@ -85,6 +86,17 @@ AuthController::AuthController() {
     } else {
         jwtSecret = "default_secret_key";
         std::cerr << "[WARN] JWT_SECRET not set. Using fallback secret!" << std::endl;
+    }
+}
+
+// Constructor with injected DB client and JWT secret used by main.cc
+AuthController::AuthController(drogon::orm::DbClientPtr dbClientParam, const std::string &jwtSecretParam)
+{
+    // Store jwt secret from main
+    jwtSecret = jwtSecretParam;
+    // Optionally set the global dbClient used across controllers
+    if (dbClientParam) {
+        dbClient = dbClientParam;
     }
 }
 

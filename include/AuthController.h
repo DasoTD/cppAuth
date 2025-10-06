@@ -1,35 +1,6 @@
-// #pragma once
-// #include <drogon/orm/DbClient.h>
-// #include "DbLoggerJSON.h"
-// #include <string>
-// #include <functional>
-
-// class DbService
-// {
-// public:
-//     explicit DbService(drogon::orm::DbClientPtr client)
-//         : dbLogger_(client) {}
-
-//     void execSqlAsync(const std::string &sql,
-//                       const drogon::orm::ResultCallback &rcb,
-//                       const drogon::orm::ExceptionCallback &ecb = nullptr)
-//     {
-//         dbLogger_.execSqlAsync(sql, rcb, ecb);
-//     }
-
-//     drogon::orm::Result execSqlSync(const std::string &sql)
-//     {
-//         return dbLogger_.execSqlSync(sql);
-//     }
-
-// private:
-//     DbLoggerJSON dbLogger_;
-// };
-
-
 #pragma once
 #include <drogon/HttpController.h>
-#include <bcrypt.h>
+#include <bcrypt/BCrypt.hpp>
 #include <jwt-cpp/jwt.h>
 #include <unordered_map>
 #include <mutex>
@@ -38,9 +9,11 @@
 
 using namespace drogon;
 
-class AuthController : public drogon::HttpController<AuthController> {
+class AuthController : public drogon::HttpController<AuthController, false> {
 public:
-    AuthController(); // Constructor declaration
+    AuthController(); // default constructor declaration
+    // Constructor used when creating controller with injected dependencies
+    AuthController(drogon::orm::DbClientPtr dbClient, const std::string &jwtSecret);
 
     METHOD_LIST_BEGIN
     ADD_METHOD_TO(AuthController::registerUser, "/register", Post);

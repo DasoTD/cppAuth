@@ -19,7 +19,12 @@ void BankController::getBalance(const HttpRequestPtr &req, std::function<void(co
     std::string token = authHeader.substr(7); // "Bearer <token>"
     std::string account;
     if (!verifyJWT(token, jwtSecret_, account)) {
-        callback(HttpResponse::newHttpResponse(HttpStatusCode::k401Unauthorized));
+        {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k401Unauthorized);
+            resp->setBody("Unauthorized");
+            callback(resp);
+        }
         return;
     }
 
@@ -27,17 +32,25 @@ void BankController::getBalance(const HttpRequestPtr &req, std::function<void(co
         "SELECT balance FROM users WHERE account_number=$1",
         [callback, account](const drogon::orm::Result &r) {
             if (r.empty()) {
-                callback(HttpResponse::newHttpResponse(HttpStatusCode::k404NotFound, "Account not found"));
+                auto resp = HttpResponse::newHttpResponse();
+                resp->setStatusCode(k404NotFound);
+                resp->setBody("Account not found");
+                callback(resp);
                 spdlog::warn("Balance check failed for {}", account);
                 return;
             }
             double balance = r[0]["balance"].as<double>();
-            callback(HttpResponse::newHttpJsonResponse({{"balance", balance}}));
+            Json::Value j;
+            j["balance"] = balance;
+            callback(HttpResponse::newHttpJsonResponse(j));
             spdlog::info("Balance retrieved for {}", account);
-        },
-        [callback, account](const std::exception &e) {
-            callback(HttpResponse::newHttpResponse(HttpStatusCode::k500InternalServerError, e.what()));
-            spdlog::error("Balance query failed for {}: {}", account, e.what());
+            },
+        [callback, account](const drogon::orm::DrogonDbException &e) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k500InternalServerError);
+            resp->setBody(std::string("Internal error: ") + e.base().what());
+            callback(resp);
+            spdlog::error("Balance query failed for {}: {}", account, e.base().what());
         },
         account
     );
@@ -48,7 +61,12 @@ void BankController::deposit(const HttpRequestPtr &req, std::function<void(const
     std::string token = authHeader.substr(7);
     std::string account;
     if (!verifyJWT(token, jwtSecret_, account)) {
-        callback(HttpResponse::newHttpResponse(HttpStatusCode::k401Unauthorized));
+        {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k401Unauthorized);
+            resp->setBody("Unauthorized");
+            callback(resp);
+        }
         return;
     }
 
@@ -56,7 +74,10 @@ void BankController::deposit(const HttpRequestPtr &req, std::function<void(const
     double amount = (*json)["amount"].asDouble();
 
     if (amount <= 0) {
-        callback(HttpResponse::newHttpResponse(HttpStatusCode::k400BadRequest, "Invalid amount"));
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k400BadRequest);
+        resp->setBody("Invalid amount");
+        callback(resp);
         return;
     }
 
@@ -64,17 +85,25 @@ void BankController::deposit(const HttpRequestPtr &req, std::function<void(const
         "UPDATE users SET balance = balance + $1 WHERE account_number=$2 RETURNING balance",
         [callback, account, amount](const drogon::orm::Result &r) {
             if (r.empty()) {
-                callback(HttpResponse::newHttpResponse(HttpStatusCode::k404NotFound, "Account not found"));
+                auto resp = HttpResponse::newHttpResponse();
+                resp->setStatusCode(k404NotFound);
+                resp->setBody("Account not found");
+                callback(resp);
                 spdlog::warn("Deposit failed for {}", account);
                 return;
             }
             double newBalance = r[0]["balance"].as<double>();
-            callback(HttpResponse::newHttpJsonResponse({{"new_balance", newBalance}}));
+            Json::Value j;
+            j["new_balance"] = newBalance;
+            callback(HttpResponse::newHttpJsonResponse(j));
             spdlog::info("Deposited {} to {}, new balance {}", amount, account, newBalance);
         },
-        [callback, account](const std::exception &e) {
-            callback(HttpResponse::newHttpResponse(HttpStatusCode::k500InternalServerError, e.what()));
-            spdlog::error("Deposit failed for {}: {}", account, e.what());
+        [callback, account](const drogon::orm::DrogonDbException &e) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k500InternalServerError);
+            resp->setBody(std::string("Internal error: ") + e.base().what());
+            callback(resp);
+            spdlog::error("Deposit failed for {}: {}", account, e.base().what());
         },
         amount, account
     );
@@ -85,7 +114,12 @@ void BankController::withdraw(const HttpRequestPtr &req, std::function<void(cons
     std::string token = authHeader.substr(7);
     std::string account;
     if (!verifyJWT(token, jwtSecret_, account)) {
-        callback(HttpResponse::newHttpResponse(HttpStatusCode::k401Unauthorized));
+        {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k401Unauthorized);
+            resp->setBody("Unauthorized");
+            callback(resp);
+        }
         return;
     }
 
@@ -96,17 +130,25 @@ void BankController::withdraw(const HttpRequestPtr &req, std::function<void(cons
         "UPDATE users SET balance = balance - $1 WHERE account_number=$2 AND balance >= $1 RETURNING balance",
         [callback, account, amount](const drogon::orm::Result &r) {
             if (r.empty()) {
-                callback(HttpResponse::newHttpResponse(HttpStatusCode::k400BadRequest, "Insufficient balance"));
+                auto resp = HttpResponse::newHttpResponse();
+                resp->setStatusCode(k400BadRequest);
+                resp->setBody("Insufficient balance");
+                callback(resp);
                 spdlog::warn("Withdraw failed for {}: insufficient balance", account);
                 return;
             }
             double newBalance = r[0]["balance"].as<double>();
-            callback(HttpResponse::newHttpJsonResponse({{"new_balance", newBalance}}));
+            Json::Value j;
+            j["new_balance"] = newBalance;
+            callback(HttpResponse::newHttpJsonResponse(j));
             spdlog::info("Withdrew {} from {}, new balance {}", amount, account, newBalance);
         },
-        [callback, account](const std::exception &e) {
-            callback(HttpResponse::newHttpResponse(HttpStatusCode::k500InternalServerError, e.what()));
-            spdlog::error("Withdraw failed for {}: {}", account, e.what());
+        [callback, account](const drogon::orm::DrogonDbException &e) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k500InternalServerError);
+            resp->setBody(std::string("Internal error: ") + e.base().what());
+            callback(resp);
+            spdlog::error("Withdraw failed for {}: {}", account, e.base().what());
         },
         amount, account
     );
@@ -117,7 +159,12 @@ void BankController::transfer(const HttpRequestPtr &req, std::function<void(cons
     std::string token = authHeader.substr(7);
     std::string fromAccount;
     if (!verifyJWT(token, jwtSecret_, fromAccount)) {
-        callback(HttpResponse::newHttpResponse(HttpStatusCode::k401Unauthorized));
+        {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k401Unauthorized);
+            resp->setBody("Unauthorized");
+            callback(resp);
+        }
         return;
     }
 
@@ -126,7 +173,10 @@ void BankController::transfer(const HttpRequestPtr &req, std::function<void(cons
     double amount = (*json)["amount"].asDouble();
 
     if (amount <= 0) {
-        callback(HttpResponse::newHttpResponse(HttpStatusCode::k400BadRequest, "Invalid amount"));
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k400BadRequest);
+        resp->setBody("Invalid amount");
+        callback(resp);
         return;
     }
 
@@ -136,12 +186,17 @@ void BankController::transfer(const HttpRequestPtr &req, std::function<void(cons
         "UPDATE users SET balance = balance + $1 WHERE account_number=$3;"
         "COMMIT;",
         [callback, fromAccount, toAccount, amount](const drogon::orm::Result &r) {
-            callback(HttpResponse::newHttpJsonResponse({{"status", "success"}}));
+            Json::Value j;
+            j["status"] = "success";
+            callback(HttpResponse::newHttpJsonResponse(j));
             spdlog::info("Transferred {} from {} to {}", amount, fromAccount, toAccount);
         },
-        [callback, fromAccount](const std::exception &e) {
-            callback(HttpResponse::newHttpResponse(HttpStatusCode::k500InternalServerError, e.what()));
-            spdlog::error("Transfer failed for {}: {}", fromAccount, e.what());
+        [callback, fromAccount](const drogon::orm::DrogonDbException &e) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k500InternalServerError);
+            resp->setBody(std::string("Internal error: ") + e.base().what());
+            callback(resp);
+            spdlog::error("Transfer failed for {}: {}", fromAccount, e.base().what());
         },
         amount, fromAccount, toAccount
     );

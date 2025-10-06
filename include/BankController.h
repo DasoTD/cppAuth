@@ -1,4 +1,7 @@
-class BankController : public drogon::HttpController<BankController> {
+#include <drogon/HttpController.h>
+using namespace drogon;
+
+class BankController : public drogon::HttpController<BankController, false> {
 public:
     BankController(drogon::orm::DbClientPtr db, const std::string &secret)
         : dbClient_(db), jwtSecret_(secret) {}

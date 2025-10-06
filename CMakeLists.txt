@@ -1,87 +1,85 @@
 cmake_minimum_required(VERSION 3.16)
-project(cppAuth)
+project(cppAuth LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# Ensure a valid C++ standard is set
+if(NOT DEFINED CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD STREQUAL "")
+    set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# ======================================================
-# Dependencies
-# ======================================================
+# Prefer Drogon config package; if not available, we'll fallback to linking 'drogon'
+find_package(Drogon CONFIG QUIET)
 
-# Drogon
-find_package(Drogon CONFIG REQUIRED)
+# Required packages
+find_package(Jsoncpp REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(PostgreSQL QUIET)
+find_package(Threads REQUIRED)
 
-# PostgreSQL
-find_package(PostgreSQL REQUIRED)
-include_directories(${PostgreSQL_INCLUDE_DIRS})
-
-# dotenv-cpp (header-only)
-include_directories(${CMAKE_SOURCE_DIR}/dotenv-cpp/include)
-
-# bcrypt (local header-only or compiled)
-include_directories(${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/include)
-#include_directories(dotenv-cpp/include)
-
-
-# jwt-cpp (header-only)
-include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
-include_directories(${CMAKE_SOURCE_DIR}/include)
-
-
-# JsonCpp (required by Drogon)
-set(JSONCPP_INCLUDE_DIRS "/usr/include/jsoncpp")
-set(JSONCPP_LIBRARIES "/usr/lib/x86_64-linux-gnu/libjsoncpp.so")
-
-
-# ======================================================
-# Source files (exclude test files)
-# ======================================================
-file(GLOB_RECURSE SRC_FILES
-    "${CMAKE_SOURCE_DIR}/*.cc"
-    "${CMAKE_SOURCE_DIR}/controllers/*.cc"
-)
-# Remove test files from SRC_FILES
-list(FILTER SRC_FILES EXCLUDE REGEX ".*/test/.*")
-list(FILTER SRC_FILES EXCLUDE REGEX ".*/tests/.*")
-list(FILTER SRC_FILES EXCLUDE REGEX ".*/base_test.cc$")
-
-# Add bcrypt implementation if needed
-list(APPEND SRC_FILES "${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/src/bcrypt.cpp")
-list(APPEND SRC_FILES "${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/src/blowfish.cpp")
-
-add_executable(${PROJECT_NAME} ${SRC_FILES})
-
-# ======================================================
-# Link libraries
-# ======================================================
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE Drogon::Drogon
-    PRIVATE ${PostgreSQL_LIBRARIES}
-    PRIVATE ${JSONCPP_LIBRARIES}
+# Collect sources
+file(GLOB_RECURSE CPPAUTH_SOURCES
+    ${CMAKE_SOURCE_DIR}/main.cc
+    ${CMAKE_SOURCE_DIR}/controllers/*.cc
 )
 
-# ======================================================
-# Include directories
-# ======================================================
+add_executable(${PROJECT_NAME} ${CPPAUTH_SOURCES})
+
+# Build bundled libbcrypt and link it so BCrypt wrapper symbols resolve at link time
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/libbcrypt/CMakeLists.txt")
+    add_subdirectory(${CMAKE_SOURCE_DIR}/external/libbcrypt)
+    # The external project creates a target named 'bcrypt'
+    target_link_libraries(${PROJECT_NAME} PRIVATE bcrypt)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/external/libbcrypt/include)
+endif()
+
+# Include dirs
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${JSONCPP_INCLUDE_DIRS}
-    ${PostgreSQL_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/controllers
+    ${CMAKE_SOURCE_DIR}/external/libbcrypt/include
+    ${CMAKE_SOURCE_DIR}/jwt-cpp/include
     ${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include
-    ${CMAKE_SOURCE_DIR}/external/bcrypt/include
-    ${CMAKE_SOURCE_DIR}/external/jwt-cpp/include
-    ${CMAKE_SOURCE_DIR}/external/dotenv-cpp/include
+    ${CMAKE_SOURCE_DIR}/external
 )
 
-target_include_directories(cppAuth PRIVATE /path/to/Bcrypt.cpp/include)
-include_directories(${CMAKE_SOURCE_DIR}/dotenv-cpp/include)
-include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
-include_directories(${CMAKE_SOURCE_DIR}/external/Bcrypt.cpp/include)
-include_directories(${CMAKE_SOURCE_DIR}/external/jwt-cpp/include)
+# Link Drogon: prefer CONFIG target if found, otherwise link 'drogon'
+if (TARGET Drogon::Drogon)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+else()
+    # Fallback: assume a system-installed drogon library is available
+    target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
+endif()
 
-# ======================================================
-# Output binary in project root (optional)
-# ======================================================
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
+# Link common libs if available
+if (PostgreSQL_FOUND)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${PostgreSQL_INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${PostgreSQL_LIBRARIES})
+endif()
+
+if (TARGET Jsoncpp::Jsoncpp)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Jsoncpp::Jsoncpp)
+else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${JSONCPP_LIBRARIES})
+endif()
+
+find_package(spdlog QUIET)
+
+if (SPDLOG_FOUND)
+    if (TARGET spdlog::spdlog)
+        target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
+    elseif(TARGET spdlog)
+        target_link_libraries(${PROJECT_NAME} PRIVATE spdlog)
+    endif()
+else()
+    # Use local shim headers (external/spdlog/include)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/external/spdlog/include)
+endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+
+# Place binary in project root for convenience
+set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+message(STATUS "cppAuth: sources=${CPPAUTH_SOURCES}")
+
