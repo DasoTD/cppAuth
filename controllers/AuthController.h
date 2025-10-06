@@ -1,35 +1,64 @@
 #pragma once
-#include <drogon/HttpController.h>
-#include <bcrypt.h>
-#include <jwt-cpp/jwt.h>
-#include <unordered_map>
-#include <mutex>
-#include <cstdlib> // for getenv
+#include <drogon/orm/DbClient.h>
+#include "DbLoggerJSON.h"
 #include <string>
+#include <functional>
 
-using namespace drogon;
-
-class AuthController : public drogon::HttpController<AuthController> {
+class DbService
+{
 public:
-    AuthController(); // Constructor declaration
+    explicit DbService(drogon::orm::DbClientPtr client)
+        : dbLogger_(client) {}
 
-    METHOD_LIST_BEGIN
-    ADD_METHOD_TO(AuthController::registerUser, "/register", Post);
-    ADD_METHOD_TO(AuthController::loginUser, "/login", Post);
-    ADD_METHOD_TO(AuthController::refreshToken, "/refresh", Post);
-    ADD_METHOD_TO(AuthController::getProfile, "/api/profile", Get);
-    METHOD_LIST_END
+    void execSqlAsync(const std::string &sql,
+                      const drogon::orm::ResultCallback &rcb,
+                      const drogon::orm::ExceptionCallback &ecb = nullptr)
+    {
+        dbLogger_.execSqlAsync(sql, rcb, ecb);
+    }
 
-    void registerUser(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
-    void loginUser(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
-    void refreshToken(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
-    void getProfile(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+    drogon::orm::Result execSqlSync(const std::string &sql)
+    {
+        return dbLogger_.execSqlSync(sql);
+    }
 
 private:
-    std::unordered_map<std::string, std::string> refreshTokens; // username -> refresh token
-    std::mutex refreshMutex;
-    std::string jwtSecret; // no longer hardcoded
-
-    std::string generateAccessToken(const std::string &username);
-    std::string generateRefreshToken(const std::string &username);
+    DbLoggerJSON dbLogger_;
 };
+
+
+// #pragma once
+// #include <drogon/HttpController.h>
+// #include <bcrypt.h>
+// #include <jwt-cpp/jwt.h>
+// #include <unordered_map>
+// #include <mutex>
+// #include <cstdlib> // for getenv
+// #include <string>
+
+// using namespace drogon;
+
+// class AuthController : public drogon::HttpController<AuthController> {
+// public:
+//     AuthController(); // Constructor declaration
+
+//     METHOD_LIST_BEGIN
+//     ADD_METHOD_TO(AuthController::registerUser, "/register", Post);
+//     ADD_METHOD_TO(AuthController::loginUser, "/login", Post);
+//     ADD_METHOD_TO(AuthController::refreshToken, "/refresh", Post);
+//     ADD_METHOD_TO(AuthController::getProfile, "/api/profile", Get);
+//     METHOD_LIST_END
+
+//     void registerUser(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+//     void loginUser(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+//     void refreshToken(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+//     void getProfile(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+
+// private:
+//     std::unordered_map<std::string, std::string> refreshTokens; // username -> refresh token
+//     std::mutex refreshMutex;
+//     std::string jwtSecret; // no longer hardcoded
+
+//     std::string generateAccessToken(const std::string &username);
+//     std::string generateRefreshToken(const std::string &username);
+// };
