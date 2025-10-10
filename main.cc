@@ -15,6 +15,7 @@ int main() {
         // Load .env
         dotenv::init();
         std::cout << "[INFO] .env file loaded successfully.\n";
+        int port = std::getenv("PORT") ? std::atoi(std::getenv("PORT")) : 8088;
 
         // Configure logger
         auto logger = spdlog::rotating_logger_mt("bank_logger", "logs/bank.log", 1024 * 1024 * 5, 3); // 5MB, 3 files
@@ -53,7 +54,7 @@ int main() {
         app().registerController(bankController);
 
         // Run HTTP server
-        app().addListener("0.0.0.0", 8088)
+        app().addListener("0.0.0.0", port)
              .setThreadNum(4)
              .run();
 
